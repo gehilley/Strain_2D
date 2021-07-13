@@ -1,5 +1,5 @@
 [general]
-method = gpsgridder
+method = delaunay_flat 
 output_dir = Output
 input_vel_file = ../test/testing_data/NorCal_stationvels.txt
 

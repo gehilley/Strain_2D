@@ -16,7 +16,7 @@ import numpy as np
 from scipy.spatial import Delaunay
 from numpy.linalg import inv
 from .. import strain_tensor_toolbox, output_manager, produce_gridded
-from strain.models.strain_2d import Strain_2d
+from Strain_2D.Strain_Tools.strain.models.strain_2d import Strain_2d
 
 
 class delaunay_flat(Strain_2d):
