@@ -7,9 +7,9 @@ import os
 import numpy as np
 from scipy.spatial.distance import pdist, cdist, squareform
 
-from strain.models.strain_2d import Strain_2d
-from strain.strain_tensor_toolbox import strain_on_regular_grid
-from strain.utilities import makeGrid, getVels
+from Strain_2D.Strain_Tools.strain.models.strain_2d import Strain_2d
+from Strain_2D.Strain_Tools.strain.strain_tensor_toolbox import strain_on_regular_grid
+from Strain_2D.Strain_Tools.strain.utilities import makeGrid, getVels
 
 
 class geostats(Strain_2d):
@@ -87,26 +87,16 @@ class geostats(Strain_2d):
             nugget = nugget
         )
 
-    def setPoints(self, xy, data):
+    def setPoints(self, xy):
         '''
         Set the data for kriging.
 
         Parameters
         ----------
         xy: 2D ndarray          XY locations of the input data
-        data: 1 or 2D ndarray   Data to krige. If 2D, will do each dim 
-                                separately
         '''
-        if data.ndim > 2:
-            raise ValueError('I can only handle 1- or 2-D data inputs')
-        if data.ndim ==2:
-            if data.shape[1] > 2:
-                raise ValueError(
-                        'Input data should be an N x 1 or N x 2 matrix'
-                    )
+
         self._xy = xy
-        self._values = np.array(data)
-        self._data_dim = self._values.ndim
 
     def setGrid(self, XY=None, XY_shape=None):
         '''
@@ -123,10 +113,19 @@ class geostats(Strain_2d):
             self._XY = XY
             self._grid_shape = XY_shape
 
-    def krige(self, ktype='ok'):
+    def krige(self, values, ktype='ok'):
         ''' 
         Interpolate velocities using kriging
         '''
+        data = np.array(values)
+        if data.ndim > 2:
+            raise ValueError('I can only handle 1- or 2-D data inputs')
+        if data.ndim ==2:
+            if data.shape[1] > 2:
+                raise ValueError(
+                    'Input data should be an N x 1 or N x 2 matrix'
+                )
+
         # Create the data covariance matrix
         SIG = compute_covariance(self._model, self._xy)
         SIG = SIG + np.sqrt(np.finfo(float).eps)*np.eye(SIG.shape[0])
@@ -137,37 +136,44 @@ class geostats(Strain_2d):
 
         # Do different things, depending on if SK, OK, or UK is desired
         if ktype == 'sk':
-            Dest, Dsig, lam = simple_kriging(SIG, sig0, self._values, sig2)
+            Dest, Dsig, lam = simple_kriging(SIG, sig0, data, sig2)
         elif ktype == 'ok':
-            Dest, Dsig, lam, nu = ordinary_kriging(SIG, sig0,self._values, sig2)
+            Dest, Dsig, lam, nu = ordinary_kriging(SIG, sig0, data, sig2)
         elif ktype == 'uk':
-            Dest, Dsig, lam = universal_kriging(SIG, sig0,self._values, sig2, self._xy, self._XY)
+            Dest, Dsig, lam = universal_kriging(SIG, sig0, data, sig2, self._xy, self._XY)
         else:
             raise ValueError('Method "{}" is not implemented'.format(self._flag))
 
         return Dest, Dsig, lam
 
-    def compute(self, myVelfield):
-        '''Compute the interpolated velocity field'''
-
-        dlon, dlat, e, n, se, sn = getVels(myVelfield)
+    def configure_network(self, myVelfield):
+        dlon, dlat, _, _, _, _ = getVels(myVelfield)
         xy = np.stack([dlon, dlat], axis=-1)
-        self.setPoints(xy=xy, data = e)
-        Dest_e, Dsig_e, _ = self.krige()
-        self.setPoints(xy=xy, data = n)
-        Dest_n, Dsig_n, _ = self.krige()
-        
+        self.setPoints(xy=xy)
+
+    def compute_with_kriging(self, myVelfield):
+
+        _, _, e, n, se, sn = getVels(myVelfield)
+
+        Dest_e, Dsig_e, _ = self.krige(e)
+        Dest_n, Dsig_n, _ = self.krige(n)
+
         # Compute strain rates
         exx, eyy, exy, rot = strain_on_regular_grid(
-                self._grid_inc[0]*111, 
-                self._grid_inc[1]*111, 
-                Dest_e.reshape(self._grid_shape), 
-                Dest_n.reshape(self._grid_shape)
-            )
+            self._grid_inc[0]*111,
+            self._grid_inc[1]*111,
+            Dest_e.reshape(self._grid_shape),
+            Dest_n.reshape(self._grid_shape)
+        )
 
         # Return the strain rates etc.
-        return self._lons, self._lats, rot, exx, exy, eyy
-        
+        return rot, exx, exy, eyy
+
+    def compute(self, myVelfield):
+
+        self.configure_network(myVelfield)
+        rot, exx, exy, eyy = self.compute_with_kriging(myVelfield)
+        return [self._lons, self._lats, rot, exx, exy, eyy]
 
 def simple_kriging(SIG, sig0, data, sig2):
     '''

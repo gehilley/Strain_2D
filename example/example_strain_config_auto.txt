@@ -1,5 +1,5 @@
 [general]
-method = delaunay
+method = geostats 
 output_dir = Output
 input_vel_file = ../test/testing_data/NorCal_stationvels.txt
 
@@ -36,7 +36,7 @@ qsec = 7
 [geostats]
 model_type = Gaussian
 sill = 20
-range = 100
+range = 0.8 
 nugget = 1
 trend = 0
 
