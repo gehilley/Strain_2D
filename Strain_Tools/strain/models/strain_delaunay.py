@@ -51,7 +51,7 @@
 import numpy as np
 from scipy.spatial import Delaunay
 from .. import output_manager, produce_gridded
-from strain.models.strain_2d import Strain_2d
+from Strain_2D.Strain_Tools.strain.models.strain_2d import Strain_2d
 
 
 class delaunay(Strain_2d):

@@ -7,8 +7,8 @@
 import numpy as np
 import subprocess
 from Tectonic_Utils.read_write import netcdf_read_write
-from .. import velocity_io, strain_tensor_toolbox, utilities
-from strain.models.strain_2d import Strain_2d
+from Strain_2D.Strain_Tools.strain import velocity_io, strain_tensor_toolbox, utilities
+from Strain_2D.Strain_Tools.strain.models.strain_2d import Strain_2d
 
 
 class gpsgridder(Strain_2d):
