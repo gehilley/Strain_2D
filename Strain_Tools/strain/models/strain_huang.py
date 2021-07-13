@@ -3,7 +3,7 @@
 
 import numpy as np
 from Tectonic_Utils.geodesy import utm_conversion
-from strain.models.strain_2d import Strain_2d
+from Strain_2D.Strain_Tools.strain.models.strain_2d import Strain_2d
 
 
 class huang(Strain_2d):
@@ -14,10 +14,139 @@ class huang(Strain_2d):
         self._radiuskm, self._nstations = verify_inputs_huang(params.method_specific);
 
     def compute(self, myVelfield):
-        [lons, lats, rot_grd, exx_grd, exy_grd, eyy_grd] = compute_huang(myVelfield, self._strain_range,
-                                                                         self._grid_inc, self._radiuskm,
-                                                                         self._nstations);
-        return [lons, lats, rot_grd, exx_grd, exy_grd, eyy_grd];
+
+        self.configure_network(myVelfield, self._strain_range,
+                               self._grid_inc, self._radiuskm,
+                               self._nstations)
+
+        [rot_grd, exx_grd, exy_grd, eyy_grd] = self.compute_with_huang_method(myVelfield);
+        return [self._xlons, self._ylats, rot_grd, exx_grd, exy_grd, eyy_grd];
+
+    def configure_network(self, myVelfield, range_strain, inc, radiuskm, nstations, verbose = False):
+
+        # Set up grids for the computation
+        self._ylats = np.arange(range_strain[2], range_strain[3]+0.00001, inc[1])
+        self._xlons = np.arange(range_strain[0], range_strain[1]+0.00001, inc[0])
+        gx = len(self._xlons)  # number of x - grid
+        gy = len(self._ylats)  # number of y - grid
+        ns = nstations  # number of selected stations
+
+        self._station_index_map = np.zeros((gy, gx, ns), dtype=np.int32)
+        self._station_dx = np.zeros((gy, gx, ns))
+        self._station_dy = np.zeros((gy, gx, ns))
+        self._enough_stations = np.zeros((gy, gx), dtype = np.bool)
+        self._invG = np.zeros((gy, gx, 3, 3))
+
+        self._lons = np.array([item.elon for item in myVelfield])
+        self._lats = np.array([item.nlat for item in myVelfield])
+
+        [elon, nlat, _, _, _, _] = velfield_to_huang_non_utm(myVelfield)
+        reflon = np.min([item.elon for item in myVelfield])
+        reflat = np.min([item.nlat for item in myVelfield])
+
+        # set up a local coordinate reference
+        refx = np.min(elon)
+        refy = np.min(nlat)
+        elon = elon - refx
+        nlat = nlat - refy
+
+        # Setting calculation parameters
+        EstimateRadius = radiuskm * 1000  # convert to meters
+
+        # 2. The main loop, getting displacement gradients around stations
+        # find at least 5 smallest distance stations
+
+        for i in range(gx):
+            for j in range(gy):
+                [gridX_loc, gridY_loc] = convert_to_local_planar(self._xlons[i], self._ylats[j], reflon, reflat)
+                X = elon   # in local coordinates, m
+                Y = nlat   # in local coordiantes, m
+                l1 = len(elon)
+
+                # the distance from stations to grid
+                r = np.zeros((l1,))
+                for ii in range(l1):
+                    r[ii] = np.sqrt((gridX_loc - X[ii]) * (gridX_loc - X[ii]) + (gridY_loc - Y[ii]) * (gridY_loc - Y[ii]))
+
+                stations = np.zeros((l1, 3))
+                stations[:, 0] = r
+                stations[:, 1] = elon.reshape((l1,))
+                stations[:, 2] = nlat.reshape((l1,))
+
+                iX = stations[stations[:, 0].argsort()]  # sort data, iX represented the order of the sorting of 1st column
+                self._station_index_map[j, i, :] = np.reshape(stations[:,0].argsort()[0:ns], (1, 1, ns)).astype(np.int32)
+                self._station_dx[j, i, :] = np.reshape(iX[0:ns,1], (1, 1, ns))
+                self._station_dy[j, i, :] = np.reshape(iX[0:ns,2], (1, 1, ns))
+                # we choose the first ns data
+                SelectStations = np.zeros((ns, 3))
+                for iiii in range(ns):
+                    SelectStations[iiii, :] = iX[iiii, :]
+
+                Px, Py = 0, 0
+                Px2, Py2, Pxy = 0, 0, 0
+
+                if SelectStations[ns-1, 0] <= EstimateRadius:
+                    self._enough_stations[j, i] = 1.0
+                    for iii in range(ns):
+                        Px = Px + SelectStations[iii, 1]
+                        Py = Py + SelectStations[iii, 2]
+                        Px2 = Px2 + SelectStations[iii, 1] * SelectStations[iii, 1]
+                        Py2 = Py2 + SelectStations[iii, 2] * SelectStations[iii, 2]
+                        Pxy = Pxy + SelectStations[iii, 1] * SelectStations[iii, 2]
+                else:
+                    self._enough_stations[j,i] = False
+                G = [[ns, Px, Py], [Px, Px2, Pxy], [Py, Pxy, Py2]]
+                if np.sum(G) == ns:
+                    self._enough_stations[j,i] = False
+                else:
+                    self._invG[j, i, :, :] = np.reshape(np.linalg.inv(G), (1, 1, 3, 3))
+
+    def compute_with_huang_method(self, myVelfield, verbose = False):
+
+        if verbose:
+            print("------------------------------\nComputing strain via Huang method.");
+
+        (gy, gx, ns) = self._station_index_map.shape
+
+        exx = np.zeros((gy, gx));
+        exy = np.zeros((gy, gx));
+        eyy = np.zeros((gy, gx));
+        rot = np.zeros((gy, gx));
+
+        e = np.array([item.e*0.001 for item in myVelfield])
+        n = np.array([item.n*0.001 for item in myVelfield])
+
+        for i in range(gx):
+            for j in range(gy):
+                if not self._enough_stations[j, i]:
+                    exx[j, i] = np.nan
+                    eyy[j, i] = np.nan
+                    exy[j, i] = np.nan
+                    rot[j, i] = np.nan
+                else:
+                    valid_station_indexes = np.reshape(self._station_index_map[j, i, :], (ns, ))
+                    valid_station_dx = np.reshape(self._station_dx[j, i, :], (ns, ))
+                    valid_station_dy = np.reshape(self._station_dy[j, i, :], (ns, ))
+                    valid_station_e = e[valid_station_indexes]
+                    valid_station_n = n[valid_station_indexes]
+                    grid_point_invG = np.reshape(self._invG[j, i, :, :], (3, 3))
+                    dU = np.sum(valid_station_e)
+                    dV = np.sum(valid_station_n)
+                    dxU = np.sum(valid_station_e*valid_station_dx)
+                    dyU = np.sum(valid_station_e*valid_station_dy)
+                    dxV = np.sum(valid_station_n*valid_station_dx)
+                    dyV = np.sum(valid_station_n*valid_station_dy)
+                    dx = np.array([[dU], [dxU], [dyU]])
+                    dy = np.array([[dV], [dxV], [dyV]])
+                    (_, Uxx, Uxy) = np.dot(grid_point_invG, dx)
+                    (_, Uyx, Uyy) = np.dot(grid_point_invG, dy)
+                    exx[j, i] = Uxx * 1e9;
+                    exy[j, i] = .5 * (Uxy + Uyx) * 1e9;
+                    eyy[j, i] = Uyy * 1e9;
+                    rot[j, i] = .5 * (Uxy - Uyx) * 1e9
+
+        return rot, exx, exy, eyy
+
 
 
 def verify_inputs_huang(method_specific_dict):
@@ -31,14 +160,17 @@ def verify_inputs_huang(method_specific_dict):
     return radiuskm, nstations;
 
 
-def compute_huang(myVelfield, range_strain, inc, radiuskm, nstations):
-    print("------------------------------\nComputing strain via Huang method.");
+def compute_huang(myVelfield, range_strain, inc, radiuskm, nstations, verbose = False):
+
+    if verbose:
+        print("------------------------------\nComputing strain via Huang method.");
 
     # Set up grids for the computation
     ylats = np.arange(range_strain[2], range_strain[3]+0.00001, inc[1]);
     xlons = np.arange(range_strain[0], range_strain[1]+0.00001, inc[0]);
     gx = len(xlons);  # number of x - grid
     gy = len(ylats);  # number of y - grid
+
 
     [elon, nlat, e, n, _, _] = velfield_to_huang_non_utm(myVelfield);
     reflon = np.min([item.elon for item in myVelfield]);
@@ -53,6 +185,10 @@ def compute_huang(myVelfield, range_strain, inc, radiuskm, nstations):
     # Setting calculation parameters
     EstimateRadius = radiuskm * 1000;  # convert to meters
     ns = nstations;  # number of selected stations
+
+    self._station_map = np.zeros((gy, gx, ns))
+    self._enough_stations = np.zeros((gy, gx), dtype = bool)
+    self._invG = np.zeros((gy, gx, 3, 3))
 
     # 2. The main loop, getting displacement gradients around stations
     # find at least 5 smallest distance stations
@@ -78,14 +214,16 @@ def compute_huang(myVelfield, range_strain, inc, radiuskm, nstations):
                 r[ii] = np.sqrt((gridX_loc - X[ii]) * (gridX_loc - X[ii]) + (gridY_loc - Y[ii]) * (gridY_loc - Y[ii]));
                 # for a particular grid point, we are computing the distance to every station
 
-            stations = np.zeros((l1, 5));
+            stations = np.zeros((l1, 3));
             stations[:, 0] = r;
             stations[:, 1] = elon.reshape((l1,));
             stations[:, 2] = nlat.reshape((l1,));
-            stations[:, 3] = e.reshape((l1,));
-            stations[:, 4] = n.reshape((l1,));
+            #stations[:, 3] = e.reshape((l1,));
+            #stations[:, 4] = n.reshape((l1,));
 
             iX = stations[stations[:, 0].argsort()];  # sort data, iX represented the order of the sorting of 1st column
+            self._station_map[j, i, :] = np.reshape(stations[:,0].argsort()[0:ns], (1, 1, ns))
+
             # we choose the first ns data
             SelectStations = np.zeros((ns, 5));
             for iiii in range(ns):
@@ -98,25 +236,27 @@ def compute_huang(myVelfield, range_strain, inc, radiuskm, nstations):
             dxV, dyV = 0, 0;  # should be inside the if statement or not?
             # print(SelectStations[ns-1, 0]);  # the distance of the cutoff station (in m)
             if SelectStations[ns-1, 0] <= EstimateRadius:
+                self._enough_stations[j, i] = True
                 for iii in range(ns):
                     Px = Px + SelectStations[iii, 1];
                     Py = Py + SelectStations[iii, 2];
                     Px2 = Px2 + SelectStations[iii, 1] * SelectStations[iii, 1];
                     Py2 = Py2 + SelectStations[iii, 2] * SelectStations[iii, 2];
                     Pxy = Pxy + SelectStations[iii, 1] * SelectStations[iii, 2];
-                    dU = dU + SelectStations[iii, 3];
-                    dxU = dxU + SelectStations[iii, 1] * SelectStations[iii, 3];
-                    dyU = dyU + SelectStations[iii, 2] * SelectStations[iii, 3];
-                    dV = dV + SelectStations[iii, 4];
-                    dxV = dxV + SelectStations[iii, 1] * SelectStations[iii, 4];
-                    dyV = dyV + SelectStations[iii, 2] * SelectStations[iii, 4];
+                    #dU = dU + SelectStations[iii, 3];
+                    #dxU = dxU + SelectStations[iii, 1] * SelectStations[iii, 3];
+                    #dyU = dyU + SelectStations[iii, 2] * SelectStations[iii, 3];
+                    #dV = dV + SelectStations[iii, 4];
+                    #dxV = dxV + SelectStations[iii, 1] * SelectStations[iii, 4];
+                    #dyV = dyV + SelectStations[iii, 2] * SelectStations[iii, 4];
+            else:
+                self._enough_stations = False
             G = [[ns, Px, Py], [Px, Px2, Pxy], [Py, Pxy, Py2]];
             if np.sum(G) == ns:
-                Uxx[j, i] = 0;
-                Uyy[j, i] = 0;
-                Uxy[j, i] = 0;
-                Uyx[j, i] = 0;
+                self._enough_stations = False
             else:
+                self._invG[j, i, :, :] = np.reshape(np.linalg.inv(G), (1, 1, 3, 3))
+
                 dx = np.array([[dU], [dxU], [dyU]]);
                 dy = np.array([[dV], [dxV], [dyV]]);
                 modelx = np.dot(np.linalg.inv(G), dx);
