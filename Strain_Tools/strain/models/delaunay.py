@@ -1,8 +1,32 @@
 import numpy as np
 from scipy.spatial import Delaunay
 from numpy.linalg import inv
+from Strain_2D.Strain_Tools.strain.models.strain_2d import Strain_2d
+from .. import output_manager, produce_gridded
 
-class DelaunayMixin(object):
+class DelaunayBaseClass(Strain_2d):
+
+    def __init__(self, params):
+        super().__init__(params.inc, params.range_strain, params.range_data, params.outdir)
+
+    def compute(self, myVelfield, verbose = False):
+
+        if verbose:
+            print("------------------------------\nComputing strain via Delaunay on flat earth, and converting to a grid.");
+
+        self.configure_network(myVelfield)
+
+        [rot, exx, exy, eyy] = self.compute_with_delaunay_polygons(myVelfield);
+
+        lons, lats, rot_grd, exx_grd, exy_grd, eyy_grd = produce_gridded.tri2grid(self._grid_inc, self._strain_range,
+                                                                                  self._triangle_vertices, rot, exx, exy, eyy);
+
+        # Here we output convenient things on polygons, since it's intuitive for the user.
+        output_manager.outputs_1d(self._xcentroid, self._ycentroid, self._triangle_vertices, rot, exx, exy, eyy, self._strain_range,
+                                  myVelfield, self._outdir);
+
+        print("Success computing strain via Delaunay method.\n");
+        return [lons, lats, rot_grd, exx_grd, exy_grd, eyy_grd];
 
     def _configure_network_with_flat_delaunay(self, myVelfield):
         elon = [x.elon for x in myVelfield];
@@ -26,7 +50,7 @@ class DelaunayMixin(object):
         self._index = np.zeros((trishape[0],3), dtype = np.int32)
         for i in range(trishape[0]):
             # Get the velocities of each vertex (VE1, VN1, VE2, VN2, VE3, VN3)
-            # Get velocities for Vertex 1 (triangle_vertices[i,0,0] and triangle_vertices[i,0,1])
+            # Get velocities for Vertex 1 (_triangle_vertices[i,0,0] and _triangle_vertices[i,0,1])
             xindex1 = np.where(elon == self._triangle_vertices[i, 0, 0])
             yindex1 = np.where(nlat == self._triangle_vertices[i, 0, 1])
             self._index[i, 0]= np.intersect1d(xindex1, yindex1);

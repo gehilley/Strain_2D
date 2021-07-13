@@ -13,34 +13,14 @@ ftp://ftp.ingv.it/pub/salvatore.barba/RevEu/Cai_StrainBIFROST_2007.pdf
 """
 
 import numpy as np
-from .. import strain_tensor_toolbox, output_manager, produce_gridded
-from Strain_2D.Strain_Tools.strain.models.strain_2d import Strain_2d
-from Strain_2D.Strain_Tools.strain.models.mixins import DelaunayMixin
+from .. import strain_tensor_toolbox
+from Strain_2D.Strain_Tools.strain.models.delaunay import DelaunayBaseClass
 
-class delaunay_flat(Strain_2d, DelaunayMixin):
+class delaunay_flat(DelaunayBaseClass):
     """ Delaunay class for 2d strain rate """
     def __init__(self, params):
-        Strain_2d.__init__(self, params.inc, params.range_strain, params.range_data, params.outdir)
+        super().__init__(params)
         self._Name = 'delaunay_flat'
-
-    def compute(self, myVelfield, verbose = False):
-
-        if verbose:
-            print("------------------------------\nComputing strain via Delaunay on flat earth, and converting to a grid.");
-
-        self.configure_network(myVelfield)
-
-        [rot, exx, exy, eyy] = self.compute_with_delaunay_polygons(myVelfield);
-
-        lons, lats, rot_grd, exx_grd, exy_grd, eyy_grd = produce_gridded.tri2grid(self._grid_inc, self._strain_range,
-                                                                                  self._triangle_vertices, rot, exx, exy, eyy);
-
-        # Here we output convenient things on polygons, since it's intuitive for the user.
-        output_manager.outputs_1d(self._xcentroid, self._ycentroid, self._triangle_vertices, rot, exx, exy, eyy, self._strain_range,
-                                  myVelfield, self._outdir);
-
-        print("Success computing strain via Delaunay method.\n");
-        return [lons, lats, rot_grd, exx_grd, exy_grd, eyy_grd];
 
     def configure_network(self, myVelfield):
         self._configure_network_with_flat_delaunay(myVelfield)
