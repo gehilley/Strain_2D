@@ -25,7 +25,7 @@ class delaunay_flat(DelaunayBaseClass):
     def configure_network(self, myVelfield):
         self._configure_network_with_flat_delaunay(myVelfield)
 
-    def compute_with_delaunay_polygons(self, myVelfield, verbose = False):
+    def compute_with_method(self, myVelfield, verbose = False):
 
         if verbose:
             print("Computing strain via delaunay method.");

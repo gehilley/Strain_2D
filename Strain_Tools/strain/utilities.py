@@ -1,6 +1,18 @@
 # A set of utility functions used throughout the Strain_2D library
 import numpy as np
+import collections
 
+Stations = collections.namedtuple('Stations', ['elon', 'nlat',  'name']);
+GPSData = collections.namedtuple('GPSData', ['e', 'n', 'u', 'se', 'sn', 'su', 'name', 'date'])
+
+def get_stations_from_myvel(myVelocities):
+    return [Stations(name = vel.name, elon = vel.elon, nlat = vel.nlat) for vel in myVelocities]
+
+def get_gpsdata_from_myvel(myVelocities, stations):
+    gpsdata = []
+    for station in stations:
+        gpsdata += [GPSData(name = vel.name, e = vel.e, n = vel.n, se = vel.se, sn = vel.sn, u = vel.u, su = vel.su, date = None) for vel in myVelocities if vel.name == station.name]
+    return gpsdata
 
 def get_float_range(string_range):
     """

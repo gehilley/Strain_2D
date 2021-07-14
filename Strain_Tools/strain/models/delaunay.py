@@ -16,16 +16,11 @@ class DelaunayBaseClass(Strain_2d):
 
         self.configure_network(myVelfield)
 
-        [rot, exx, exy, eyy] = self.compute_with_delaunay_polygons(myVelfield);
+        [rot, exx, exy, eyy] = self.compute_with_method(myVelfield);
 
         lons, lats, rot_grd, exx_grd, exy_grd, eyy_grd = produce_gridded.tri2grid(self._grid_inc, self._strain_range,
                                                                                   self._triangle_vertices, rot, exx, exy, eyy);
 
-        # Here we output convenient things on polygons, since it's intuitive for the user.
-        output_manager.outputs_1d(self._xcentroid, self._ycentroid, self._triangle_vertices, rot, exx, exy, eyy, self._strain_range,
-                                  myVelfield, self._outdir);
-
-        print("Success computing strain via Delaunay method.\n");
         return [lons, lats, rot_grd, exx_grd, exy_grd, eyy_grd];
 
     def _configure_network_with_flat_delaunay(self, myVelfield):
