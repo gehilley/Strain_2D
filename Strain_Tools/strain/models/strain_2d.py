@@ -33,3 +33,13 @@ class Strain_2d(ABC):
     def compute(self, myVelfield):
         # generic method to be implemented in each method
         pass
+
+    @abstractmethod
+    def configure_network(self, stations):
+        # generic method to be implemented in each method
+        pass
+
+    @abstractmethod
+    def compute_with_method(self, gpsdata):
+        # generic method to be implemented in each method
+        pass

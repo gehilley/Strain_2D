@@ -9,8 +9,7 @@ from scipy.spatial.distance import pdist, cdist, squareform
 
 from Strain_2D.Strain_Tools.strain.models.strain_2d import Strain_2d
 from Strain_2D.Strain_Tools.strain.strain_tensor_toolbox import strain_on_regular_grid
-from Strain_2D.Strain_Tools.strain.utilities import makeGrid, getVels
-
+from Strain_2D.Strain_Tools.strain.utilities import makeGrid, getVels, get_stations_from_myvel, get_gpsdata_from_myvel
 
 class geostats(Strain_2d):
     """ 
@@ -146,14 +145,18 @@ class geostats(Strain_2d):
 
         return Dest, Dsig, lam
 
-    def configure_network(self, myVelfield):
-        dlon, dlat, _, _, _, _ = getVels(myVelfield)
+    def configure_network(self, stations):
+        dlon = np.array([station.elon for station in stations])
+        dlat = np.array([station.nlat for station in stations])
         xy = np.stack([dlon, dlat], axis=-1)
         self.setPoints(xy=xy)
 
-    def compute_with_kriging(self, myVelfield):
+    def compute_with_method(self, gpsdata):
 
-        _, _, e, n, se, sn = getVels(myVelfield)
+        e = np.array([gpsdatum.e for gpsdatum in gpsdata])
+        n = np.array([gpsdatum.n for gpsdatum in gpsdata])
+        se = np.array([gpsdatum.se for gpsdatum in gpsdata])
+        sn = np.array([gpsdatum.sn for gpsdatum in gpsdata])
 
         Dest_e, Dsig_e, _ = self.krige(e)
         Dest_n, Dsig_n, _ = self.krige(n)
@@ -171,8 +174,11 @@ class geostats(Strain_2d):
 
     def compute(self, myVelfield):
 
-        self.configure_network(myVelfield)
-        rot, exx, exy, eyy = self.compute_with_kriging(myVelfield)
+        stations = get_stations_from_myvel(myVelfield)
+        gpsdata = get_gpsdata_from_myvel(myVelfield, stations)
+
+        self.configure_network(stations)
+        rot, exx, exy, eyy = self.compute_with_method(gpsdata)
         return [self._lons, self._lats, rot, exx, exy, eyy]
 
 def simple_kriging(SIG, sig0, data, sig2):
