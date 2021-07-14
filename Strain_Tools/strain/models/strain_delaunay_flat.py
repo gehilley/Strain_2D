@@ -22,16 +22,16 @@ class delaunay_flat(DelaunayBaseClass):
         super().__init__(params)
         self._Name = 'delaunay_flat'
 
-    def configure_network(self, myVelfield):
-        self._configure_network_with_flat_delaunay(myVelfield)
+    def configure_network(self, stations):
+        self._configure_network_with_flat_delaunay(stations)
 
-    def compute_with_method(self, myVelfield, verbose = False):
+    def compute_with_method(self, gpsdata, verbose = False):
 
         if verbose:
             print("Computing strain via delaunay method.");
 
-        e = [x.e for x in myVelfield];
-        n = [x.n for x in myVelfield];
+        e = [x.e for x in gpsdata];
+        n = [x.n for x in gpsdata];
 
         # Initialize arrays.
         rot = [];

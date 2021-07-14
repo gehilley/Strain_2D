@@ -1,5 +1,5 @@
 [general]
-method = huang 
+method = delaunay
 output_dir = Output
 input_vel_file = ../test/testing_data/NorCal_stationvels.txt
 

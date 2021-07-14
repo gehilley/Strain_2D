@@ -60,8 +60,8 @@ class delaunay(DelaunayBaseClass):
         super().__init__(params)
         self._Name = 'delaunay'
 
-    def configure_network(self, myVelfield):
-        self._configure_network_with_flat_delaunay(myVelfield)
+    def configure_network(self, stations):
+        self._configure_network_with_flat_delaunay(stations)
         self._phi = np.zeros((self._triangle_vertices.shape[0], 3))
         self._theta = np.zeros((self._triangle_vertices.shape[0], 3))
 
@@ -80,16 +80,16 @@ class delaunay(DelaunayBaseClass):
                     self._triangle_vertices[i, 2, 1] - 90.0
                 ]), (1, 3))
 
-    def compute_with_delaunay_polygons(self, myVelfield):
+    def compute_with_method(self, gpsdata):
 
         # Initialize arrays.
         rot = []
         exx, exy, eyy = [], [], []
 
-        e = [x.e for x in myVelfield]
-        n = [x.n for x in myVelfield]
-        se = [x.se for x in myVelfield]
-        sn = [x.sn for x in myVelfield]
+        e = [x.e for x in gpsdata]
+        n = [x.n for x in gpsdata]
+        se = [x.se for x in gpsdata]
+        sn = [x.sn for x in gpsdata]
 
         # for each triangle:
         for i in range(self._triangle_vertices.shape[0]):

@@ -3,6 +3,7 @@ from scipy.spatial import Delaunay
 from numpy.linalg import inv
 from Strain_2D.Strain_Tools.strain.models.strain_2d import Strain_2d
 from .. import output_manager, produce_gridded
+from Strain_2D.Strain_Tools.strain.utilities import get_stations_from_myvel, get_gpsdata_from_myvel
 
 class DelaunayBaseClass(Strain_2d):
 
@@ -11,21 +12,24 @@ class DelaunayBaseClass(Strain_2d):
 
     def compute(self, myVelfield, verbose = False):
 
+        stations = get_stations_from_myvel(myVelfield)
+        gpsdata = get_gpsdata_from_myvel(myVelfield, stations)
+
         if verbose:
             print("------------------------------\nComputing strain via Delaunay on flat earth, and converting to a grid.");
 
-        self.configure_network(myVelfield)
+        self.configure_network(stations)
 
-        [rot, exx, exy, eyy] = self.compute_with_method(myVelfield);
+        [rot, exx, exy, eyy] = self.compute_with_method(gpsdata);
 
         lons, lats, rot_grd, exx_grd, exy_grd, eyy_grd = produce_gridded.tri2grid(self._grid_inc, self._strain_range,
                                                                                   self._triangle_vertices, rot, exx, exy, eyy);
 
         return [lons, lats, rot_grd, exx_grd, exy_grd, eyy_grd];
 
-    def _configure_network_with_flat_delaunay(self, myVelfield):
-        elon = [x.elon for x in myVelfield];
-        nlat = [x.nlat for x in myVelfield];
+    def _configure_network_with_flat_delaunay(self, stations):
+        elon = [x.elon for x in stations];
+        nlat = [x.nlat for x in stations];
         z = np.array([elon, nlat]);
         z = z.T;
         tri = Delaunay(z);
