@@ -27,6 +27,14 @@ class DelaunayBaseClass(Strain_2d):
 
         return [lons, lats, rot_grd, exx_grd, exy_grd, eyy_grd];
 
+    def compute_gridded(self, gpsdata):
+
+        [rot, exx, exy, eyy] = self.compute_with_method(gpsdata);
+
+        lons, lats, rot_grd, exx_grd, exy_grd, eyy_grd = produce_gridded.tri2grid(self._grid_inc, self._strain_range,
+                                                                                  self._triangle_vertices, rot, exx, exy, eyy);
+        return [lons, lats, rot_grd, exx_grd, exy_grd, eyy_grd];
+
     def _configure_network_with_flat_delaunay(self, stations):
         elon = [x.elon for x in stations];
         nlat = [x.nlat for x in stations];

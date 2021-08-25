@@ -172,6 +172,10 @@ class geostats(Strain_2d):
         # Return the strain rates etc.
         return rot, exx, exy, eyy
 
+    def compute_gridded(self, gpsdata):
+        rot, exx, exy, eyy = self.compute_with_method(gpsdata)
+        return [self._lons, self._lats, rot, exx, exy, eyy]
+
     def compute(self, myVelfield):
 
         stations = get_stations_from_myvel(myVelfield)

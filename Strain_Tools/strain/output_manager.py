@@ -72,7 +72,7 @@ def outputs_1d(xcentroid, ycentroid, polygon_vertices, rot, exx, exy, eyy, range
     return;
 
 
-def get_grid_eigenvectors(xdata, ydata, w1, w2, v00, v01, v10, v11):
+def get_grid_eigenvectors(xdata, ydata, w1, w2, v00, v01, v10, v11, do_not_print_value = 200, overmax_scale = 200, eigs_dec = 12):
     """
     Resamples eigenvectors on regular grid, with maximum eigenvalue imposed
     Returns two lists of "stationvels" objects for plotting vectors
@@ -86,9 +86,6 @@ def get_grid_eigenvectors(xdata, ydata, w1, w2, v00, v01, v10, v11):
     :param v10: 2d arrays of floats
     :param v11: 2d arrays of floats
     """
-    eigs_dec = 12;
-    do_not_print_value = 200;
-    overmax_scale = 200;
     positive_eigs, negative_eigs = [], [];
     for j in range(len(ydata)):
         for k in range(len(xdata)):

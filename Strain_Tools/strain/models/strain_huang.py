@@ -17,12 +17,19 @@ class huang(Strain_2d):
         stations = get_stations_from_myvel(myVelfield)
         gpsdata = get_gpsdata_from_myvel(myVelfield, stations)
 
-        self.configure_network(stations, radiuskm=self._radiuskm, nstations=self._nstations)
+        self.configure_network(stations)
         [rot_grd, exx_grd, exy_grd, eyy_grd] = self.compute_with_method(gpsdata);
         return [self._xlons, self._ylats, rot_grd, exx_grd, exy_grd, eyy_grd];
 
-    def configure_network(self, stations, radiuskm = 80, nstations = 8, verbose = False):
+    def compute_gridded(self, gpsdata):
+        [rot_grd, exx_grd, exy_grd, eyy_grd] = self.compute_with_method(gpsdata);
+        return [self._xlons, self._ylats, rot_grd, exx_grd, exy_grd, eyy_grd];
 
+
+    def configure_network(self, stations, verbose = False):
+
+        radiuskm = self._radiuskm
+        nstations = self._nstations
         # Set up grids for the computation
         self._ylats = np.arange(self._strain_range[2], self._strain_range[3]+0.00001, self._grid_inc[1])
         self._xlons = np.arange(self._strain_range[0], self._strain_range[1]+0.00001, self._grid_inc[0])

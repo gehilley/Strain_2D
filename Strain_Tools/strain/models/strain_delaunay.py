@@ -93,40 +93,45 @@ class delaunay(DelaunayBaseClass):
 
         # for each triangle:
         for i in range(self._triangle_vertices.shape[0]):
+            if np.isnan(e[self._index[i,0]]) or np.isnan(e[self._index[i,1]]) or np.isnan(e[self._index[i,2]]):
+                exx.append(np.nan)
+                exy.append(np.nan)
+                eyy.append(np.nan)
+                rot.append(np.nan)
+            else:
+                u_phi = np.array([e[self._index[i,0]], e[self._index[i,1]], e[self._index[i,2]]])
+                u_theta = np.array([n[self._index[i,0]], n[self._index[i,1]], n[self._index[i,2]]])
+                u_theta = np.array([-i for i in u_theta])  # colatitude needs negative theta values.
+                s_phi = np.array([se[self._index[i,0]], se[self._index[i,1]], se[self._index[i,2]]])
+                s_theta = np.array([sn[self._index[i,0]], sn[self._index[i,1]], sn[self._index[i,2]]])
 
-            u_phi = np.array([e[self._index[i,0]], e[self._index[i,1]], e[self._index[i,2]]])
-            u_theta = np.array([n[self._index[i,0]], n[self._index[i,1]], n[self._index[i,2]]])
-            u_theta = np.array([-i for i in u_theta])  # colatitude needs negative theta values.
-            s_phi = np.array([se[self._index[i,0]], se[self._index[i,1]], se[self._index[i,2]]])
-            s_theta = np.array([sn[self._index[i,0]], sn[self._index[i,1]], sn[self._index[i,2]]])
 
+                # HERE WE PLUG IN BILL'S CODE!
+                weight = 1;
+                paramsel = 0;
+                [e_phiphi, e_thetaphi, e_thetatheta, omega_r, U_theta, U_phi, s_omega_r, \
+                    s_e_phiphi, s_e_thetaphi, s_e_thetatheta, s_U_theta, s_U_phi, chi2, \
+                    OMEGA, THETA_p, PHI_p, s_OMEGA, s_THETA_p, s_PHI_p, r_PHITHETA, u_phi_p, \
+                    u_theta_p] = strain_sphere(
+                        np.reshape(self._phi[i,:], (3,)),
+                        np.reshape(self._theta[i,:], (3,)),
+                        u_phi,
+                        u_theta,
+                        s_phi,
+                        s_theta,
+                        weight,
+                        paramsel
+                    );
 
-            # HERE WE PLUG IN BILL'S CODE!
-            weight = 1;
-            paramsel = 0;
-            [e_phiphi, e_thetaphi, e_thetatheta, omega_r, U_theta, U_phi, s_omega_r, \
-                s_e_phiphi, s_e_thetaphi, s_e_thetatheta, s_U_theta, s_U_phi, chi2, \
-                OMEGA, THETA_p, PHI_p, s_OMEGA, s_THETA_p, s_PHI_p, r_PHITHETA, u_phi_p, \
-                u_theta_p] = strain_sphere(
-                    np.reshape(self._phi[i,:], (3,)),
-                    np.reshape(self._theta[i,:], (3,)),
-                    u_phi,
-                    u_theta,
-                    s_phi,
-                    s_theta,
-                    weight,
-                    paramsel
-                );
+                # The components that are easily computed
+                # Units: nanostrain per year.
+                # There might be a sign issue here compared to other codes.
+                exx.append(-e_phiphi * 1e6);
+                exy.append(e_thetaphi * 1e6);
+                eyy.append(-e_thetatheta * 1e6);
 
-            # The components that are easily computed
-            # Units: nanostrain per year.
-            # There might be a sign issue here compared to other codes.
-            exx.append(-e_phiphi * 1e6);
-            exy.append(e_thetaphi * 1e6);
-            eyy.append(-e_thetatheta * 1e6);
-
-            # # Compute a number of values based on tensor properties.
-            rot.append(OMEGA * 1000 * 1000);
+                # # Compute a number of values based on tensor properties.
+                rot.append(OMEGA * 1000 * 1000);
 
         return [rot, exx, exy, eyy];
 
@@ -205,13 +210,11 @@ def strain_sphere(phi, theta, u_phi, u_theta, s_phi, s_theta, weight, paramsel):
 
     covd = np.diag(np.hstack((np.square(s_phi), np.square(s_theta))));
     # Same as Matlab's
-
     if weight == 1:
         W = np.diag(1. / np.diag(covd));  # this checks out.
         M = np.dot(np.linalg.inv(np.dot(np.dot(G.T, W), G)), np.dot(G.T, W));
     else:
         M = np.dot(np.linalg.inv(np.dot(G.T, G)), G.T);
-
     m = np.dot(M, d);
     # m is the same between python and matlab
 

@@ -3,7 +3,7 @@
 import numpy as np
 import matplotlib.path
 
-def tri2grid(grid_inc, range_strain, triangle_vertices, rot, exx, exy, eyy):
+def tri2grid(grid_inc, range_strain, triangle_vertices, rot, exx, exy, eyy, verbose = False):
     """
     Bring delaunay 1-D quantities into the same 2-D form as the other methods
 
@@ -15,15 +15,19 @@ def tri2grid(grid_inc, range_strain, triangle_vertices, rot, exx, exy, eyy):
     :param exy: 1D array
     :param eyy: 1D array
     """
-    lons, lats, _ = make_grid(range_strain, grid_inc);
-    print("Producing gridded dataset of: Exx")
-    exx_grd = find_in_triangles(triangle_vertices, exx, lons, lats);
-    print("Producing gridded dataset of: Exy")
-    exy_grd = find_in_triangles(triangle_vertices, exy, lons, lats);
-    print("Producing gridded dataset of: Eyy")
-    eyy_grd = find_in_triangles(triangle_vertices, eyy, lons, lats);
-    print("Producing gridded dataset of: Rot")
-    rot_grd = find_in_triangles(triangle_vertices, rot, lons, lats);
+    lons, lats, _ = make_grid(range_strain, grid_inc)
+    if verbose:
+        print("Producing gridded dataset of: Exx")
+    exx_grd = find_in_triangles(triangle_vertices, exx, lons, lats)
+    if verbose:
+        print("Producing gridded dataset of: Exy")
+    exy_grd = find_in_triangles(triangle_vertices, exy, lons, lats)
+    if verbose:
+        print("Producing gridded dataset of: Eyy")
+    eyy_grd = find_in_triangles(triangle_vertices, eyy, lons, lats)
+    if verbose:
+        print("Producing gridded dataset of: Rot")
+    rot_grd = find_in_triangles(triangle_vertices, rot, lons, lats)
     return lons, lats, rot_grd, exx_grd, exy_grd, eyy_grd;
 
 

@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-
+from .. import produce_gridded
 class Strain_2d(ABC):
     """
     Implement a generic 2D strain rate method
@@ -35,6 +35,10 @@ class Strain_2d(ABC):
         pass
 
     @abstractmethod
+    def compute_gridded(self, gpsdata):
+        pass
+
+    @abstractmethod
     def configure_network(self, stations):
         # generic method to be implemented in each method
         pass
@@ -43,3 +47,7 @@ class Strain_2d(ABC):
     def compute_with_method(self, gpsdata):
         # generic method to be implemented in each method
         pass
+
+    @property
+    def strain_range(self):
+        return self._strain_range
