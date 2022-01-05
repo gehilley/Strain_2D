@@ -47,14 +47,10 @@ class gpsgridder(Strain_2d):
         xin = np.arange(self._strain_range[0], self._strain_range[1], self._grid_inc[0])
         yin = np.arange(self._strain_range[2], self._strain_range[3], self._grid_inc[1])
         lat_center = np.mean(np.array([self._strain_range[2], self._strain_range[3]]))
-        [xin_p, yin_p] = convert_geographic_to_km(xin, yin, lat_center)
+        [xin_p, yin_p] = convert_geographic_to_m(xin, yin, lat_center)
         dx = np.mean(np.diff(xin_p))
         dy = np.mean(np.diff(yin_p))
         [exx, eyy, exy, rot] = strain_tensor_toolbox.strain_on_regular_grid(dx, dy, Ux, Uy)
-        exx = np.multiply(exx, 1000);
-        exy = np.multiply(exy, 1000);
-        eyy = np.multiply(eyy, 1000);
-        rot = abs(np.multiply(rot, 1000));
 
         return rot, exx, exy, eyy
 
@@ -110,6 +106,10 @@ def find_item_by_name(iterable, name):
 def convert_geographic_to_km(x, y, lat_center):
     return x * 111.13 * np.cos(np.deg2rad(lat_center)), y * 111.13
 
+def convert_geographic_to_m(x, y, lat_center):
+    return x * 111130.0 * np.cos(np.deg2rad(lat_center)), y * 111130.0
+
+
 def gpsgridder_func(stations, gpsdata, strain_range, grid_inc, nu = 0.3, fudge_factor = None, eigenvalue_ratio = None):
 
     names = [g.name for g in gpsdata if g.e is not np.nan and g.n is not np.nan]
@@ -124,14 +124,14 @@ def gpsgridder_func(stations, gpsdata, strain_range, grid_inc, nu = 0.3, fudge_f
 
     lat_center = np.mean(strain_range[2:3])
 
-    xp, yp = convert_geographic_to_km(xi,yi,lat_center)
+    xp, yp = convert_geographic_to_m(xi,yi,lat_center)
     n = xp.shape[0]
     (xp, yp) = (np.reshape(xp, (n, 1)), np.reshape(yp, (n, 1)))
     (ui, vi) = (np.reshape(ui, (n, 1)), np.reshape(vi, (n, 1)))
     X, Y = np.meshgrid(np.arange(strain_range[0], strain_range[1], grid_inc[0]), np.arange(strain_range[2], strain_range[3], grid_inc[1]))
     (ny, nx) = X.shape
     (xr, yr) = (np.reshape(X, (ny*nx, 1)), np.reshape(Y, (ny*nx, 1)))
-    xgrid_p, ygrid_p = convert_geographic_to_km(xr, yr, lat_center)
+    xgrid_p, ygrid_p = convert_geographic_to_m(xr, yr, lat_center)
     q, p, w = get_qpw(np.hstack((xp, yp)), np.hstack((xp, yp)), nu, fudge_factor)
     if eigenvalue_ratio is None:
         wt = np.matmul(inv(np.vstack((np.hstack((q, w)),np.hstack((w, p))))), np.vstack((ui, vi)))
